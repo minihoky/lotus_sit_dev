@@ -1,4 +1,5 @@
 import { db, propertyCount } from "./index.js";
+import { currentTimestampIso } from "../lib/time.js";
 import type { Property } from "../types/property.js";
 
 type SeedProperty = Omit<Property, "createdAt">;
@@ -750,7 +751,7 @@ const upsert = db.prepare(`
     beds, baths, parking, area, price, price_value, description, features, created_at
   ) VALUES (
     ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+    ?, ?, ?, ?, ?, ?, ?, ?, ?
   )
   ON CONFLICT(slug) DO UPDATE SET
     title = excluded.title,
@@ -787,6 +788,7 @@ export function seedDatabase() {
       p.priceValue,
       JSON.stringify(p.description),
       JSON.stringify(p.features),
+      currentTimestampIso(),
     );
   }
   console.log(`Seeded ${SEED_PROPERTIES.length} properties (${propertyCount()} total in database).`);

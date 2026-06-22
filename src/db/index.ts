@@ -13,6 +13,7 @@ import {
 import type { CreatePropertyInput, Property, PropertyFilters } from "../types/property.js";
 import type { Inquiry } from "../types/inquiry.js";
 import { generateUniqueSlug } from "../lib/slug.js";
+import { currentTimestampIso, storedTimestampToIso } from "../lib/time.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "..", "..", "data");
@@ -117,6 +118,30 @@ export function getSimilarProperties(slug: string, limit = 3): Property[] {
   return rows.map(rowToProperty);
 }
 
+function mapInquiryRow(row: {
+  id: number;
+  property_slug: string | null;
+  property_title: string | null;
+  name: string;
+  phone: string;
+  email: string;
+  message: string | null;
+  created_at: string;
+  read_at: string | null;
+}): Inquiry {
+  return {
+    id: row.id,
+    propertySlug: row.property_slug,
+    propertyTitle: row.property_title,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    message: row.message,
+    createdAt: storedTimestampToIso(row.created_at) ?? row.created_at,
+    readAt: storedTimestampToIso(row.read_at),
+  };
+}
+
 export function createInquiry(input: {
   propertySlug?: string;
   name: string;
@@ -124,9 +149,10 @@ export function createInquiry(input: {
   email: string;
   message?: string;
 }): { id: number } {
+  const createdAt = currentTimestampIso();
   const stmt = db.prepare(
-    `INSERT INTO inquiries (property_slug, name, phone, email, message)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO inquiries (property_slug, name, phone, email, message, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   );
   const result = stmt.run(
     input.propertySlug ?? null,
@@ -134,6 +160,7 @@ export function createInquiry(input: {
     input.phone,
     input.email,
     input.message ?? null,
+    createdAt,
   );
 
   return { id: Number(result.lastInsertRowid) };
@@ -172,17 +199,7 @@ export function listInquiries(limit?: number): Inquiry[] {
     read_at: string | null;
   }>;
 
-  return rows.map((row) => ({
-    id: row.id,
-    propertySlug: row.property_slug,
-    propertyTitle: row.property_title,
-    name: row.name,
-    phone: row.phone,
-    email: row.email,
-    message: row.message,
-    createdAt: row.created_at,
-    readAt: row.read_at,
-  }));
+  return rows.map(mapInquiryRow);
 }
 
 export function deleteInquiry(id: number): boolean {
@@ -227,38 +244,31 @@ export function listUnreadInquiries(): Inquiry[] {
     read_at: string | null;
   }>;
 
-  return rows.map((row) => ({
-    id: row.id,
-    propertySlug: row.property_slug,
-    propertyTitle: row.property_title,
-    name: row.name,
-    phone: row.phone,
-    email: row.email,
-    message: row.message,
-    createdAt: row.created_at,
-    readAt: row.read_at,
-  }));
+  return rows.map(mapInquiryRow);
 }
 
 export function markInquiriesAsRead(ids?: number[]): number {
+  const readAt = currentTimestampIso();
+
   if (ids !== undefined && ids.length > 0) {
     const placeholders = ids.map(() => "?").join(", ");
     const result = db
       .prepare(
-        `UPDATE inquiries SET read_at = datetime('now') WHERE id IN (${placeholders}) AND read_at IS NULL`,
+        `UPDATE inquiries SET read_at = ? WHERE id IN (${placeholders}) AND read_at IS NULL`,
       )
-      .run(...ids);
+      .run(readAt, ...ids);
     return Number(result.changes);
   }
 
   const result = db
-    .prepare("UPDATE inquiries SET read_at = datetime('now') WHERE read_at IS NULL")
-    .run();
+    .prepare("UPDATE inquiries SET read_at = ? WHERE read_at IS NULL")
+    .run(readAt);
   return Number(result.changes);
 }
 
 export function createProperty(input: CreatePropertyInput): Property {
   const slug = generateUniqueSlug(input.title, (candidate) => Boolean(getPropertyBySlug(candidate)));
+  const createdAt = currentTimestampIso();
 
   const stmt = db.prepare(`
     INSERT INTO properties (
@@ -266,7 +276,7 @@ export function createProperty(input: CreatePropertyInput): Property {
       beds, baths, parking, area, price, price_value, description, features, created_at
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+      ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
   `);
 
@@ -286,6 +296,7 @@ export function createProperty(input: CreatePropertyInput): Property {
     input.priceValue,
     JSON.stringify(input.description),
     JSON.stringify(input.features),
+    createdAt,
   );
 
   const created = getPropertyBySlug(slug);

@@ -1,4 +1,5 @@
 import type { Property, PropertyFeature } from "../types/property.js";
+import { storedTimestampToIso } from "../lib/time.js";
 
 export type PropertyRow = {
   slug: string;
@@ -47,7 +48,7 @@ export function rowToProperty(row: PropertyRow): Property {
     priceValue: row.price_value,
     description: JSON.parse(row.description) as string[],
     features: JSON.parse(row.features) as PropertyFeature[],
-    createdAt: row.created_at ?? new Date(0).toISOString(),
+    createdAt: storedTimestampToIso(row.created_at) ?? new Date(0).toISOString(),
   };
 }
 
@@ -68,7 +69,7 @@ export const CREATE_PROPERTIES_TABLE = `
     price_value INTEGER NOT NULL,
     description TEXT NOT NULL,
     features TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   )
 `;
 
@@ -84,7 +85,7 @@ export const CREATE_INQUIRIES_TABLE = `
     phone TEXT NOT NULL,
     email TEXT NOT NULL,
     message TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     read_at TEXT
   )
 `;
