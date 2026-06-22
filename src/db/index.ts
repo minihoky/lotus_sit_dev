@@ -5,10 +5,12 @@ import { fileURLToPath } from "node:url";
 import {
   CREATE_INQUIRIES_TABLE,
   CREATE_PROPERTIES_TABLE,
+  MIGRATE_PROPERTIES_CREATED_AT,
   rowToProperty,
   type PropertyRow,
 } from "./schema.js";
-import type { Property, PropertyFilters } from "../types/property.js";
+import type { CreatePropertyInput, Property, PropertyFilters } from "../types/property.js";
+import { generateUniqueSlug } from "../lib/slug.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "..", "..", "data");
@@ -21,6 +23,20 @@ db.exec("PRAGMA journal_mode = WAL");
 db.exec("PRAGMA foreign_keys = ON");
 db.exec(CREATE_PROPERTIES_TABLE);
 db.exec(CREATE_INQUIRIES_TABLE);
+
+function migratePropertiesTable() {
+  const columns = db.prepare("PRAGMA table_info(properties)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "created_at")) {
+    db.exec(MIGRATE_PROPERTIES_CREATED_AT);
+  }
+  db.exec("UPDATE properties SET created_at = datetime('now') WHERE created_at IS NULL");
+}
+
+migratePropertiesTable();
+
+function orderClause(sort: PropertyFilters["sort"]): string {
+  return sort === "price" ? "price_value DESC" : "created_at DESC";
+}
 
 export function listProperties(filters: PropertyFilters = {}): Property[] {
   const conditions: string[] = [];
@@ -61,11 +77,16 @@ export function listProperties(filters: PropertyFilters = {}): Property[] {
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filters.limit !== undefined ? `LIMIT ${Math.max(1, filters.limit)}` : "";
+  const orderBy = orderClause(filters.sort);
 
-  const stmt = db.prepare(`SELECT * FROM properties ${where} ORDER BY price_value DESC ${limit}`);
+  const stmt = db.prepare(`SELECT * FROM properties ${where} ORDER BY ${orderBy} ${limit}`);
   const rows = stmt.all(...params) as PropertyRow[];
 
   return rows.map(rowToProperty);
+}
+
+export function listRecentProperties(limit = 5): Property[] {
+  return listProperties({ limit, sort: "recent" });
 }
 
 export function getPropertyBySlug(slug: string): Property | undefined {
@@ -104,6 +125,99 @@ export function createInquiry(input: {
   );
 
   return { id: Number(result.lastInsertRowid) };
+}
+
+export function createProperty(input: CreatePropertyInput): Property {
+  const slug = generateUniqueSlug(input.title, (candidate) => Boolean(getPropertyBySlug(candidate)));
+
+  const stmt = db.prepare(`
+    INSERT INTO properties (
+      slug, title, location, address, badge, image, gallery,
+      beds, baths, parking, area, price, price_value, description, features, created_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+    )
+  `);
+
+  stmt.run(
+    slug,
+    input.title,
+    input.location,
+    input.address,
+    input.badge ?? "DESTAQUE",
+    input.image,
+    JSON.stringify(input.gallery),
+    input.beds,
+    input.baths,
+    input.parking,
+    input.area,
+    input.price,
+    input.priceValue,
+    JSON.stringify(input.description),
+    JSON.stringify(input.features),
+  );
+
+  const created = getPropertyBySlug(slug);
+  if (!created) {
+    throw new Error("Failed to create property");
+  }
+  return created;
+}
+
+export function deleteProperty(slug: string): boolean {
+  const result = db.prepare("DELETE FROM properties WHERE slug = ?").run(slug);
+  return result.changes > 0;
+}
+
+export function updateProperty(slug: string, input: CreatePropertyInput): Property {
+  const existing = getPropertyBySlug(slug);
+  if (!existing) {
+    throw new Error("Property not found");
+  }
+
+  const stmt = db.prepare(`
+    UPDATE properties SET
+      title = ?,
+      location = ?,
+      address = ?,
+      badge = ?,
+      image = ?,
+      gallery = ?,
+      beds = ?,
+      baths = ?,
+      parking = ?,
+      area = ?,
+      price = ?,
+      price_value = ?,
+      description = ?,
+      features = ?
+    WHERE slug = ?
+  `);
+
+  stmt.run(
+    input.title,
+    input.location,
+    input.address,
+    input.badge ?? "DESTAQUE",
+    input.image,
+    JSON.stringify(input.gallery),
+    input.beds,
+    input.baths,
+    input.parking,
+    input.area,
+    input.price,
+    input.priceValue,
+    JSON.stringify(input.description),
+    JSON.stringify(input.features),
+    slug,
+  );
+
+  const updated = getPropertyBySlug(slug);
+  if (!updated) {
+    throw new Error("Failed to update property");
+  }
+  return updated;
 }
 
 export function propertyCount(): number {

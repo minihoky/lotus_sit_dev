@@ -1,13 +1,15 @@
 import { db, propertyCount } from "./index.js";
 import type { Property } from "../types/property.js";
 
+type SeedProperty = Omit<Property, "createdAt">;
+
 const IMG = {
   p1: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&q=80&auto=format&fit=crop",
   p2: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=900&q=80&auto=format&fit=crop",
   p3: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80&auto=format&fit=crop",
 };
 
-const SEED_PROPERTIES: Property[] = [
+const SEED_PROPERTIES: SeedProperty[] = [
   {
     slug: "casa-em-condominio",
     title: "Casa em Condomínio",
@@ -123,10 +125,10 @@ const SEED_PROPERTIES: Property[] = [
 const upsert = db.prepare(`
   INSERT INTO properties (
     slug, title, location, address, badge, image, gallery,
-    beds, baths, parking, area, price, price_value, description, features
+    beds, baths, parking, area, price, price_value, description, features, created_at
   ) VALUES (
     ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
   )
   ON CONFLICT(slug) DO UPDATE SET
     title = excluded.title,

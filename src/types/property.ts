@@ -33,7 +33,10 @@ export type Property = {
   priceValue: number;
   description: string[];
   features: PropertyFeature[];
+  createdAt: string;
 };
+
+export type PropertySort = "recent" | "price";
 
 export type PropertyFilters = {
   q?: string;
@@ -43,4 +46,22 @@ export type PropertyFilters = {
   minPrice?: number;
   maxPrice?: number;
   limit?: number;
+  sort?: PropertySort;
+};
+
+export type CreatePropertyInput = {
+  title: string;
+  location: string;
+  address: string;
+  badge?: PropertyBadge;
+  image: string;
+  gallery: string[];
+  beds: number;
+  baths: number;
+  parking: number;
+  area: number;
+  price: string;
+  priceValue: number;
+  description: string[];
+  features: PropertyFeature[];
 };

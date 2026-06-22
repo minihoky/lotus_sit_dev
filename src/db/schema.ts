@@ -16,6 +16,7 @@ export type PropertyRow = {
   price_value: number;
   description: string;
   features: string;
+  created_at: string;
 };
 
 export type InquiryRow = {
@@ -45,6 +46,7 @@ export function rowToProperty(row: PropertyRow): Property {
     priceValue: row.price_value,
     description: JSON.parse(row.description) as string[],
     features: JSON.parse(row.features) as PropertyFeature[],
+    createdAt: row.created_at ?? new Date(0).toISOString(),
   };
 }
 
@@ -64,8 +66,13 @@ export const CREATE_PROPERTIES_TABLE = `
     price TEXT NOT NULL,
     price_value INTEGER NOT NULL,
     description TEXT NOT NULL,
-    features TEXT NOT NULL
+    features TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
+`;
+
+export const MIGRATE_PROPERTIES_CREATED_AT = `
+  ALTER TABLE properties ADD COLUMN created_at TEXT
 `;
 
 export const CREATE_INQUIRIES_TABLE = `
