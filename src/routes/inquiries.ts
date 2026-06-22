@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { createInquiry, getPropertyBySlug } from "../db/index.js";
+import { createInquiry, getPropertyBySlug, listInquiries } from "../db/index.js";
 
 const inquirySchema = z.object({
   propertySlug: z.string().min(1).optional(),
@@ -10,7 +10,21 @@ const inquirySchema = z.object({
   message: z.string().trim().optional(),
 });
 
+const listQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 export const inquiriesRouter = new Hono();
+
+inquiriesRouter.get("/", (c) => {
+  const parsed = listQuerySchema.safeParse(c.req.query());
+  if (!parsed.success) {
+    return c.json({ error: "Invalid query parameters", details: parsed.error.flatten() }, 400);
+  }
+
+  const inquiries = listInquiries(parsed.data.limit);
+  return c.json({ data: inquiries, total: inquiries.length });
+});
 
 inquiriesRouter.post("/", async (c) => {
   let body: unknown;

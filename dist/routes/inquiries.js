@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { createInquiry, getPropertyBySlug } from "../db/index.js";
+import { createInquiry, getPropertyBySlug, listInquiries } from "../db/index.js";
 const inquirySchema = z.object({
     propertySlug: z.string().min(1).optional(),
     name: z.string().trim().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -8,7 +8,18 @@ const inquirySchema = z.object({
     email: z.string().trim().email("E-mail inválido"),
     message: z.string().trim().optional(),
 });
+const listQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+});
 export const inquiriesRouter = new Hono();
+inquiriesRouter.get("/", (c) => {
+    const parsed = listQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) {
+        return c.json({ error: "Invalid query parameters", details: parsed.error.flatten() }, 400);
+    }
+    const inquiries = listInquiries(parsed.data.limit);
+    return c.json({ data: inquiries, total: inquiries.length });
+});
 inquiriesRouter.post("/", async (c) => {
     let body;
     try {

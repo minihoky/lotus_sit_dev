@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import type { CreatePropertyInput, Property, PropertyFilters } from "../types/property.js";
+import type { Inquiry } from "../types/inquiry.js";
 declare const db: DatabaseSync;
 export declare function listProperties(filters?: PropertyFilters): Property[];
 export declare function listRecentProperties(limit?: number): Property[];
@@ -14,6 +15,7 @@ export declare function createInquiry(input: {
 }): {
     id: number;
 };
+export declare function listInquiries(limit?: number): Inquiry[];
 export declare function createProperty(input: CreatePropertyInput): Property;
 export declare function deleteProperty(slug: string): boolean;
 export declare function updateProperty(slug: string, input: CreatePropertyInput): Property;

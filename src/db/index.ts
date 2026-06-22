@@ -10,6 +10,7 @@ import {
   type PropertyRow,
 } from "./schema.js";
 import type { CreatePropertyInput, Property, PropertyFilters } from "../types/property.js";
+import type { Inquiry } from "../types/inquiry.js";
 import { generateUniqueSlug } from "../lib/slug.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -125,6 +126,49 @@ export function createInquiry(input: {
   );
 
   return { id: Number(result.lastInsertRowid) };
+}
+
+export function listInquiries(limit?: number): Inquiry[] {
+  const safeLimit = limit !== undefined ? Math.max(1, Math.min(limit, 100)) : undefined;
+  const limitClause = safeLimit !== undefined ? `LIMIT ${safeLimit}` : "";
+
+  const stmt = db.prepare(`
+    SELECT
+      i.id,
+      i.property_slug,
+      i.name,
+      i.phone,
+      i.email,
+      i.message,
+      i.created_at,
+      p.title AS property_title
+    FROM inquiries i
+    LEFT JOIN properties p ON i.property_slug = p.slug
+    ORDER BY i.created_at DESC
+    ${limitClause}
+  `);
+
+  const rows = stmt.all() as Array<{
+    id: number;
+    property_slug: string | null;
+    property_title: string | null;
+    name: string;
+    phone: string;
+    email: string;
+    message: string | null;
+    created_at: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    propertySlug: row.property_slug,
+    propertyTitle: row.property_title,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    message: row.message,
+    createdAt: row.created_at,
+  }));
 }
 
 export function createProperty(input: CreatePropertyInput): Property {

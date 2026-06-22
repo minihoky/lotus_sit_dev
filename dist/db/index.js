@@ -80,6 +80,36 @@ export function createInquiry(input) {
     const result = stmt.run(input.propertySlug ?? null, input.name, input.phone, input.email, input.message ?? null);
     return { id: Number(result.lastInsertRowid) };
 }
+export function listInquiries(limit) {
+    const safeLimit = limit !== undefined ? Math.max(1, Math.min(limit, 100)) : undefined;
+    const limitClause = safeLimit !== undefined ? `LIMIT ${safeLimit}` : "";
+    const stmt = db.prepare(`
+    SELECT
+      i.id,
+      i.property_slug,
+      i.name,
+      i.phone,
+      i.email,
+      i.message,
+      i.created_at,
+      p.title AS property_title
+    FROM inquiries i
+    LEFT JOIN properties p ON i.property_slug = p.slug
+    ORDER BY i.created_at DESC
+    ${limitClause}
+  `);
+    const rows = stmt.all();
+    return rows.map((row) => ({
+        id: row.id,
+        propertySlug: row.property_slug,
+        propertyTitle: row.property_title,
+        name: row.name,
+        phone: row.phone,
+        email: row.email,
+        message: row.message,
+        createdAt: row.created_at,
+    }));
+}
 export function createProperty(input) {
     const slug = generateUniqueSlug(input.title, (candidate) => Boolean(getPropertyBySlug(candidate)));
     const stmt = db.prepare(`
