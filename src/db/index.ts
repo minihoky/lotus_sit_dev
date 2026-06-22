@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   CREATE_INQUIRIES_TABLE,
   CREATE_PROPERTIES_TABLE,
+  MIGRATE_INQUIRIES_READ_AT,
   MIGRATE_PROPERTIES_CREATED_AT,
   rowToProperty,
   type PropertyRow,
@@ -34,6 +35,16 @@ function migratePropertiesTable() {
 }
 
 migratePropertiesTable();
+
+function migrateInquiriesTable() {
+  const columns = db.prepare("PRAGMA table_info(inquiries)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "read_at")) {
+    db.exec(MIGRATE_INQUIRIES_READ_AT);
+    db.exec("UPDATE inquiries SET read_at = created_at WHERE read_at IS NULL");
+  }
+}
+
+migrateInquiriesTable();
 
 function orderClause(sort: PropertyFilters["sort"]): string {
   return sort === "price" ? "price_value DESC" : "created_at DESC";
@@ -141,6 +152,7 @@ export function listInquiries(limit?: number): Inquiry[] {
       i.email,
       i.message,
       i.created_at,
+      i.read_at,
       p.title AS property_title
     FROM inquiries i
     LEFT JOIN properties p ON i.property_slug = p.slug
@@ -157,6 +169,7 @@ export function listInquiries(limit?: number): Inquiry[] {
     email: string;
     message: string | null;
     created_at: string;
+    read_at: string | null;
   }>;
 
   return rows.map((row) => ({
@@ -168,7 +181,80 @@ export function listInquiries(limit?: number): Inquiry[] {
     email: row.email,
     message: row.message,
     createdAt: row.created_at,
+    readAt: row.read_at,
   }));
+}
+
+export function deleteInquiry(id: number): boolean {
+  const result = db.prepare("DELETE FROM inquiries WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
+export function countUnreadInquiries(): number {
+  const row = db.prepare("SELECT COUNT(*) as count FROM inquiries WHERE read_at IS NULL").get() as {
+    count: number;
+  };
+  return row.count;
+}
+
+export function listUnreadInquiries(): Inquiry[] {
+  const stmt = db.prepare(`
+    SELECT
+      i.id,
+      i.property_slug,
+      i.name,
+      i.phone,
+      i.email,
+      i.message,
+      i.created_at,
+      i.read_at,
+      p.title AS property_title
+    FROM inquiries i
+    LEFT JOIN properties p ON i.property_slug = p.slug
+    WHERE i.read_at IS NULL
+    ORDER BY i.created_at DESC
+  `);
+
+  const rows = stmt.all() as Array<{
+    id: number;
+    property_slug: string | null;
+    property_title: string | null;
+    name: string;
+    phone: string;
+    email: string;
+    message: string | null;
+    created_at: string;
+    read_at: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    propertySlug: row.property_slug,
+    propertyTitle: row.property_title,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    message: row.message,
+    createdAt: row.created_at,
+    readAt: row.read_at,
+  }));
+}
+
+export function markInquiriesAsRead(ids?: number[]): number {
+  if (ids !== undefined && ids.length > 0) {
+    const placeholders = ids.map(() => "?").join(", ");
+    const result = db
+      .prepare(
+        `UPDATE inquiries SET read_at = datetime('now') WHERE id IN (${placeholders}) AND read_at IS NULL`,
+      )
+      .run(...ids);
+    return Number(result.changes);
+  }
+
+  const result = db
+    .prepare("UPDATE inquiries SET read_at = datetime('now') WHERE read_at IS NULL")
+    .run();
+  return Number(result.changes);
 }
 
 export function createProperty(input: CreatePropertyInput): Property {

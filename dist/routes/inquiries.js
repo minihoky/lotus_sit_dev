@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { createInquiry, getPropertyBySlug, listInquiries } from "../db/index.js";
+import { createInquiry, deleteInquiry, getPropertyBySlug, listInquiries } from "../db/index.js";
 const inquirySchema = z.object({
     propertySlug: z.string().min(1).optional(),
     name: z.string().trim().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -43,4 +43,15 @@ inquiriesRouter.post("/", async (c) => {
             message: "Mensagem enviada com sucesso. Entraremos em contato em breve.",
         },
     }, 201);
+});
+inquiriesRouter.delete("/:id", (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id < 1) {
+        return c.json({ error: "Invalid inquiry id" }, 400);
+    }
+    const deleted = deleteInquiry(id);
+    if (!deleted) {
+        return c.json({ error: "Inquiry not found" }, 404);
+    }
+    return c.json({ data: { id, message: "Reserva excluída com sucesso." } });
 });

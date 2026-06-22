@@ -110,6 +110,10 @@ export function listInquiries(limit) {
         createdAt: row.created_at,
     }));
 }
+export function deleteInquiry(id) {
+    const result = db.prepare("DELETE FROM inquiries WHERE id = ?").run(id);
+    return result.changes > 0;
+}
 export function createProperty(input) {
     const slug = generateUniqueSlug(input.title, (candidate) => Boolean(getPropertyBySlug(candidate)));
     const stmt = db.prepare(`

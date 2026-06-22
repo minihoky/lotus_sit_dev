@@ -27,6 +27,7 @@ export type InquiryRow = {
   email: string;
   message: string | null;
   created_at: string;
+  read_at: string | null;
 };
 
 export function rowToProperty(row: PropertyRow): Property {
@@ -83,6 +84,11 @@ export const CREATE_INQUIRIES_TABLE = `
     phone TEXT NOT NULL,
     email TEXT NOT NULL,
     message TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    read_at TEXT
   )
+`;
+
+export const MIGRATE_INQUIRIES_READ_AT = `
+  ALTER TABLE inquiries ADD COLUMN read_at TEXT
 `;
