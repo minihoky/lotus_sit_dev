@@ -1,10 +1,10 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { propertyCount } from "./db/index.js";
 import { seedDatabase } from "./db/seed.js";
+import { corsMiddleware } from "./lib/cors.js";
 import { getUploadsDir } from "./lib/uploads.js";
 import { inquiriesRouter } from "./routes/inquiries.js";
 import { notificationsRouter } from "./routes/notifications.js";
@@ -16,17 +16,8 @@ if (propertyCount() === 0) {
 
 const app = new Hono();
 
-const API_HOST = process.env.API_HOST ?? '0.0.0.0';
+const API_HOST = process.env.API_HOST ?? "0.0.0.0";
 const API_PORT = Number(process.env.PORT) || 10000;
-const API_ORIGIN = `http://${API_HOST}:${API_PORT}`;
-
-// const API_PORT = Number(process.env.PORT ?? 3001);
-
-// serve({
-//   fetch: app.fetch,
-//   port: Number(process.env.PORT) || 10000,
-//   hostname: '127.0.0.1',
-//   })
 
 const allowedOrigins = (
   process.env.CORS_ORIGINS ??
@@ -35,23 +26,20 @@ const allowedOrigins = (
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:8081",
+    "http://127.0.0.1:5173",
     "http://127.0.0.1:8080",
     "http://127.0.0.1:8081",
-    API_ORIGIN,
+    "https://*.vercel.app",
+    "https://*.lovable.app",
+    "https://*.lovableproject.com",
   ].join(",")
 )
   .split(",")
-  .map((o) => o.trim());
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 app.use("*", logger());
-app.use(
-  "*",
-  cors({
-    origin: allowedOrigins,
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
-  }),
-);
+app.use("*", corsMiddleware(allowedOrigins));
 
 app.get("/api/health", (c) =>
   c.json({
