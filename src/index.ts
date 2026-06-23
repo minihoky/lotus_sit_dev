@@ -16,9 +16,17 @@ if (propertyCount() === 0) {
 
 const app = new Hono();
 
-const API_HOST = process.env.API_HOST ?? "127.0.0.1";
-const API_PORT = Number(process.env.PORT ?? 3001);
+const API_HOST = process.env.API_HOST ?? '0.0.0.0';
+const API_PORT = Number(process.env.PORT) || 10000;
 const API_ORIGIN = `http://${API_HOST}:${API_PORT}`;
+
+// const API_PORT = Number(process.env.PORT ?? 3001);
+
+// serve({
+//   fetch: app.fetch,
+//   port: Number(process.env.PORT) || 10000,
+//   hostname: '127.0.0.1',
+//   })
 
 const allowedOrigins = (
   process.env.CORS_ORIGINS ??
@@ -77,5 +85,7 @@ const port = API_PORT;
 serve({ fetch: app.fetch, port, hostname: API_HOST }, () => {
   console.log(`Lótus Imóveis API running at http://${API_HOST}:${port}`);
 });
+
+
 
 export default app;
